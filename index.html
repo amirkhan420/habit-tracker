@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101114">
+<title>আমার অভ্যাস</title>
+<style>
+:root{color-scheme:dark;--bg:#101114;--card:#1b1d22;--muted:#a5a8b2;--green:#9ce6ad;--line:#343740}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#f5f5f7;font-family:system-ui,"Noto Sans Bengali",sans-serif}
+main{max-width:650px;margin:auto;padding:24px 16px 50px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px}
+h1{font-size:27px;margin:0 0 5px}
+p{margin:5px 0;color:var(--muted);font-size:14px}
+button,input{font:inherit}
+button{cursor:pointer}
+.primary{background:var(--green);color:#102016;border:0;border-radius:13px;padding:13px 16px;font-weight:750}
+.panel,.habit{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border-radius:16px;padding:15px}
+.stat strong{display:block;font-size:23px;margin-top:5px}
+.muted{color:var(--muted);font-size:13px}
+.habit-top{display:flex;align-items:center;gap:12px}
+.habit-name{flex:1;min-width:0;font-size:17px;font-weight:700;overflow-wrap:anywhere}
+.check{width:49px;height:49px;border-radius:15px;border:1px solid #4b5059;background:#252830;color:var(--green);font-size:24px;flex-shrink:0}
+.check.done{background:var(--green);color:#102016;border-color:var(--green)}
+.smallbtn{background:#292c33;color:#eee;border:1px solid #424650;border-radius:10px;padding:8px 11px}
+.habit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.calendar{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;margin-top:14px}
+.day{aspect-ratio:1;border-radius:6px;background:#30333a;display:flex;align-items:center;justify-content:center;font-size:11px;color:#c1c3cb}
+.day.done{background:#70cb88;color:#102016;font-weight:800}
+.day.today{outline:2px solid #fff;outline-offset:1px}
+.day.future{opacity:.3}
+.progress{height:7px;background:#30333a;border-radius:8px;overflow:hidden;margin-top:12px}
+.progress div{height:100%;background:var(--green);transition:width .25s}
+input{width:100%;min-width:0;background:#101114;color:#fff;border:1px solid #424650;border-radius:12px;padding:13px;outline-color:var(--green)}
+.formrow{display:flex;gap:8px;margin-top:13px}
+.formrow input{flex:1}
+#celebrate{display:none;text-align:center;padding:18px;background:#203b2a;border:1px solid #497654;border-radius:16px;margin-bottom:18px}
+#celebrate.show{display:block}
+#celebrate strong{font-size:19px;color:var(--green)}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:28px}
+details summary{cursor:pointer;color:var(--green);font-size:13px;margin-top:15px}
+@media(max-width:360px){main{padding:18px 11px}.habit{padding:12px}.calendar{gap:4px}.day{font-size:10px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <p>প্রতিদিন একটু একটু করে 🌱</p>
+    <h1>আমার অভ্যাস</h1>
+    <p id="today"></p>
+  </div>
+  <div style="font-size:35px" aria-hidden="true">🌿</div>
+</header>
+
+<section class="stats">
+  <div class="stat"><span class="muted">আজ সম্পন্ন</span><strong id="progressText">০ / ০</strong><div class="progress"><div id="progressBar" style="width:0%"></div></div></div>
+  <div class="stat"><span class="muted">আজকের স্ট্যাটাস</span><strong id="statusText">শুরু করো 💪</strong><p id="remaining"></p></div>
+</section>
+
+<section id="celebrate" role="status" aria-live="polite">
+  <div style="font-size:32px">🎉 🎊 🌟</div>
+  <strong>দারুণ! আজকের সব অভ্যাস সম্পন্ন!</strong>
+  <p>নিজের জন্য গর্বিত হও। এভাবেই এগিয়ে চলো!</p>
+</section>
+
+<section class="panel">
+  <strong>নতুন অভ্যাস যোগ করো</strong>
+  <p>সর্বোচ্চ ৬টি দৈনিক অভ্যাস রাখতে পারবে।</p>
+  <form class="formrow" id="addForm">
+    <input id="habitInput" maxlength="50" placeholder="যেমন: ২০ মিনিট বই পড়া" required>
+    <button class="primary" type="submit">যোগ +</button>
+  </form>
+  <p id="formMessage" role="status"></p>
+</section>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin:24px 2px 12px">
+  <strong>তোমার অভ্যাসগুলো</strong>
+  <span class="muted" id="countLabel">০ / ৬</span>
+</div>
+<section id="habits"></section>
+
+<footer>তোমার তথ্য এই ফোনের ব্রাউজারেই সেভ হয় • বিজ্ঞাপন নেই • সাবস্ক্রিপশন নেই</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+const KEY="amar-habit-tracker-v1";
+const $=id=>document.getElementById(id);
+const bn=n=>Number(n).toLocaleString("bn-BD");
+const dateKey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const todayKey=()=>dateKey(new Date());
+function shiftDate(key,amount){
+ const [y,m,d]=key.split("-").map(Number);
+ const date=new Date(y,m-1,d);
+ date.setDate(date.getDate()+amount);
+ return dateKey(date);
+}
+function read(){
+ try{
+  const v=JSON.parse(localStorage.getItem(KEY));
+  if(v&&Array.isArray(v.habits)&&v.logs&&typeof v.logs==="object"){
+   return {habits:v.habits.slice(0,6).filter(h=>h&&typeof h.id==="string"&&typeof h.name==="string"),logs:v.logs};
+  }
+ }catch(e){}
+ return {habits:[],logs:{}};
+}
+let data=read();
+let celebratedDate="";
+let openCalendar="";
+function save(){
+ try{
+  localStorage.setItem(KEY,JSON.stringify(data));
+  return true;
+ }catch(e){
+  $("formMessage").textContent="ফোনে জায়গা বা ব্রাউজার স্টোরেজের সমস্যা হয়েছে।";
+  return false;
+ }
+}
+function isDone(id,key){
+ return Array.isArray(data.logs[id])&&data.logs[id].includes(key);
+}
+function streak(id){
+ let cursor=todayKey(),n=0;
+ if(!isDone(id,cursor))cursor=shiftDate(cursor,-1);
+ while(isDone(id,cursor)&&n<10000){n++;cursor=shiftDate(cursor,-1);}
+ return n;
+}
+function render(){
+ const today=todayKey();
+ $("today").textContent=new Date().toLocaleDateString("bn-BD",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+ const done=data.habits.filter(h=>isDone(h.id,today)).length;
+ const total=data.habits.length;
+ $("progressText").textContent=bn(done)+" / "+bn(total);
+ $("progressBar").style.width=(total?done/total*100:0)+"%";
+ $("statusText").textContent=total&&done===total?"সম্পূর্ণ 🎉":total?"চালিয়ে যাও 💪":"শুরু করো 🌱";
+ $("remaining").textContent=total&&done<total?"বাকি "+bn(total-done)+"টি":total?"আজকের লক্ষ্য পূরণ হয়েছে":"প্রথম অভ্যাস যোগ করো";
+ $("countLabel").textContent=bn(total)+" / ৬";
+ $("formMessage").textContent=total>=6?"সর্বোচ্চ ৬টি অভ্যাস যোগ করা হয়েছে।":"";
+ $("habitInput").disabled=total>=6;
+ document.querySelector("#addForm button").disabled=total>=6;
+ document.querySelector("#addForm button").style.opacity=total>=6?".5":"1";
+ const celebration=$("celebrate");
+ celebration.classList.toggle("show",total>0&&done===total);
+ if(total>0&&done===total&&celebratedDate!==today){
+  celebratedDate=today;
+  try{if(navigator.vibrate)navigator.vibrate([100,50,100]);}catch(e){}
+ }
+ const root=$("habits");root.replaceChildren();
+ if(!total){
+  const empty=document.createElement("div");
+  empty.className="panel";
+  empty.innerHTML="<div style='font-size:32px'>🌱</div><strong>নতুন শুরু, নতুন অভ্যাস</strong><p>উপরের ঘরে তোমার প্রথম অভ্যাসটি লেখো।</p>";
+  root.append(empty);
+ }
+ data.habits.forEach(h=>{
+  const yes=isDone(h.id,today);
+  const card=document.createElement("article");card.className="habit";
+  const top=document.createElement("div");top.className="habit-top";
+  const name=document.createElement("div");name.className="habit-name";name.textContent=h.name;
+  const check=document.createElement("button");
+  check.className="check"+(yes?" done":"");
+  check.textContent=yes?"✓":"○";
+  check.setAttribute("aria-label",h.name+(yes?" সম্পন্ন হয়েছে":" সম্পন্ন করো"));
+  check.setAttribute("aria-pressed",String(yes));
+  check.onclick=()=>{
+   const log=data.logs[h.id]||(data.logs[h.id]=[]);
+   const i=log.indexOf(today);
+   if(i>=0)log.splice(i,1);else log.push(today);
+   save();render();
+  };
+  top.append(name,check);card.append(top);
+  const meta=document.createElement("p");
+  meta.textContent="🔥 ধারাবাহিকতা: "+bn(streak(h.id))+" দিন";
+  card.append(meta);
+  const actions=document.createElement("div");actions.className="habit-actions";
+  const calBtn=document.createElement("button");calBtn.className="smallbtn";
+  calBtn.textContent=(openCalendar===h.id?"ক্যালেন্ডার বন্ধ":"৩০ দিনের ক্যালেন্ডার");
+  calBtn.onclick=()=>{openCalendar=openCalendar===h.id?"":h.id;render();};
+  const del=document.createElement("button");del.className="smallbtn";
+  del.textContent="মুছে ফেলো";
+  del.onclick=()=>{
+   if(!confirm("“"+h.name+"” অভ্যাসটি এবং এর ইতিহাস মুছে ফেলবে?"))return;
+   data.habits=data.habits.filter(x=>x.id!==h.id);
+   delete data.logs[h.id];
+   if(openCalendar===h.id)openCalendar="";
+   save();render();
+  };
+  actions.append(calBtn,del);card.append(actions);
+  if(openCalendar===h.id){
+   const title=document.createElement("p");
+   title.textContent="আজসহ গত ৩০ দিন • সবুজ = সম্পন্ন";
+   card.append(title);
+   const grid=document.createElement("div");grid.className="calendar";
+   for(let i=29;i>=0;i--){
+    const key=shiftDate(today,-i);
+    const cell=document.createElement("div");
+    cell.className="day"+(isDone(h.id,key)?" done":"")+(key===today?" today":"");
+    cell.textContent=String(Number(key.slice(-2)));
+    cell.title=key+(isDone(h.id,key)?" • সম্পন্ন":" • অসম্পন্ন");
+    cell.setAttribute("aria-label",cell.title);
+    grid.append(cell);
+   }
+   card.append(grid);
+   const sum=document.createElement("p");
+   const total30=Array.from({length:30},(_,i)=>shiftDate(today,-i)).filter(k=>isDone(h.id,k)).length;
+   sum.textContent="৩০ দিনে সম্পন্ন: "+bn(total30)+" / ৩০ দিন";
+   card.append(sum);
+  }
+  root.append(card);
+ });
+}
+$("addForm").addEventListener("submit",e=>{
+ e.preventDefault();
+ const name=$("habitInput").value.trim();
+ if(!name)return;
+ if(data.habits.length>=6){$("formMessage").textContent="৬টির বেশি অভ্যাস যোগ করা যাবে না।";return;}
+ if(data.habits.some(h=>h.name.toLocaleLowerCase()===name.toLocaleLowerCase())){
+  $("formMessage").textContent="এই অভ্যাসটি আগে থেকেই আছে।";return;
+ }
+ const id="h-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+ data.habits.push({id,name});
+ if(save()){$("habitInput").value="";openCalendar="";render();}
+});
+render();
+})();
+</script>
+</body>
+</html>
